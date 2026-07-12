@@ -1,0 +1,77 @@
+# 外部からの通信を待ち受けるWebサーバーではないので、コンテナを常時稼働させるためのDeployment、
+# 外部からの通信をコンテナへ振り分ける窓口であるService、どちらも設定不要
+
+# ==========================================
+# 1. サービスアカウントの作成
+# ==========================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubeguard-sa
+  namespace: default
+
+---
+# ==========================================
+# 2. 読み取り権限（ClusterRole）の定義
+# Goツールが全NamespaceのPod, Deployment, Serviceを取得できるようにする
+# ==========================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeguard-viewer
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list"]
+
+---
+# ==========================================
+# 3. 権限の紐づけ（ClusterRoleBinding）
+# ==========================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubeguard-viewer-binding
+subjects:
+- kind: ServiceAccount
+  name: kubeguard-sa
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: kubeguard-viewer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ==========================================
+# 4. 定期実行ジョブ (CronJob)
+# ==========================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kubeguard-cronjob
+spec:
+  # 毎日、日本時間の深夜3時0分に実行する設定
+  schedule: "0 3 * * *"
+  timeZone: "Asia/Tokyo"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: kubeguard-sa # 作成した権限を付与
+          containers:
+          - name: kubeguard
+            image: asia-northeast1-docker.pkg.dev/your-project/your-repo/kubeguard:latest
+            # Goツールの処理内でSlackへ通知を送るための環境変数
+            env:
+            - name: SLACK_WEBHOOK_URL # コンテナに渡す環境変数
+              valueFrom:
+                secretKeyRef:
+                  name: slack-secret # あらかじめSecretとしてコマンドで登録しておく必要あり【注意】
+                  key: webhook-url # slack-secretというSecretに入っているデータ
+          restartPolicy: OnFailure
+

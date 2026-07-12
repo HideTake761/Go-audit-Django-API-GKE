@@ -1,0 +1,114 @@
+# ==========================================
+# DRF API Deployment (アプリケーション本体)
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drf-api-deployment
+  labels:
+    app: drf-api
+spec:
+  # 【監査クリア】可用性確保のため2以上を設定
+  replicas: 2
+  # 【監査クリア】ダウンタイムなしのアップデート戦略
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: drf-api
+  template:
+    metadata:
+      labels:
+        app: drf-api
+    spec:
+      containers:
+      - name: drf-api-container # 運用時にログを確認する際(>kubectl logs -c drf-api-container)に使用する識別子になる
+        image: drf-api:latest # ローカルPCでの動作確認用。ローカルにあるイメージ名を記入。
+        # image: asia-northeast1-docker.pkg.dev/your-project/your-repo/drf-api:latest # 本番(GCP)環境用
+        # Artifact Registry等の正しいイメージパスを記入【注意】
+        imagePullPolicy: Never # ローカルPCでの動作確認用。本番(GCP)環境ではコメントアウトする。
+        # ローカルPCでの動作確認でこれを忘れると、Kubernetesがインターネット上のレジストリ(Docker Hubなど)から
+        # イメージを探そうとしてエラー(ImagePullBackOff)になる。
+        ports:
+        - containerPort: 8000
+
+        # Django用の環境変数
+        env:
+        - name: DJANGO_SETTINGS_MODULE
+          value: "api_server.settings" # 本番用設定ファイルの指定など
+        - name: DEBUG
+          value: "False"
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: drf-secrets
+              key: secret-key
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: drf-secrets
+              key: database-url      
+
+        # 【監査クリア】CPUリクエストの設定
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        # 【監査クリア】Liveness Probe(死活監視)の設定
+        livenessProbe:
+          httpGet:
+            path: /health/ # DRF側でヘルスチェック用エンドポイントを作成してください【注意】
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+
+---
+# ==========================================
+# DRF API Service (内部通信用の経路)
+# ※Ingressがここを参照するため type: ClusterIP でOK
+# ==========================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: drf-api-service
+spec:
+  # 【監査クリア】NodePort/LoadBalancerの警告を避けるためClusterIPを使用
+  # ※外部公開する場合は、この前段にIngressやAPI Gatewayを配置するのが推奨
+  type: ClusterIP
+  # 【監査クリア】DeploymentのLabelsと完全に一致させる
+  selector:
+    app: drf-api
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+
+# ==========================================
+# DRF API Ingress (ロードバランサーの設定)
+# ==========================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: drf-api-ingress
+  annotations:
+    # GCPのIngressコントローラに対し、外部ロードバランサーを作るよう指示
+    # なのでTerraformでロードバランサー作成を書く必要がない。
+    kubernetes.io/ingress.global-static-ip-name: "drf-api-static-ip" # 静的IPアドレスの割り当て
+spec:
+  ingressClassName: "gce"
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: drf-api-service # 上記のService名を指定
+            port:
+              number: 80          # Serviceで定義したポート
