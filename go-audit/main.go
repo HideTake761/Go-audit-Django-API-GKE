@@ -48,7 +48,8 @@ func main() {
 	clientset, err := getK8sClient()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating k8s client: %v\n", err)
-		os.Exit(1) // CI/CDパイプラインを失敗させるために終了コード1を返す
+		os.Exit(1)
+		// クライアント作成失敗(致命的エラー)のため、終了コード1で異常終了させてCronJobに失敗を検知させる
 	}
 
 	ctx := context.Background()
@@ -131,7 +132,6 @@ func main() {
 			// 通知に失敗してもプログラム自体はパニックさせず、エラーログだけ残す
 			fmt.Fprintf(os.Stderr, "Warning: Failed to send Slack notification: %v\n", err)
 		}
-		os.Exit(1)
 	}
 }
 

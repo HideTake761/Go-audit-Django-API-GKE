@@ -63,7 +63,7 @@ spec:
         # 【監査クリア】Liveness Probe(死活監視)の設定
         livenessProbe:
           httpGet:
-            path: /health/ # DRF側でヘルスチェック用エンドポイントを作成してください【注意】
+            path: /health/ # DRF側でヘルスチェック用エンドポイントを作成
             port: 8000
           initialDelaySeconds: 15
           periodSeconds: 20
