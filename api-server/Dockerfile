@@ -16,4 +16,6 @@ COPY . .
 EXPOSE 8000
 
 # Allows access to the container from outside by binding to 0.0.0.0:8000
-CMD ["gunicorn", "api_server.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "api_server.wsgi:application", "--bind", "0.0.0.0:8000", \
+    "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info" \
+    ]
