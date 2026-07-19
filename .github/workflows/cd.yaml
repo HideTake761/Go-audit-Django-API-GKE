@@ -1,0 +1,160 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: asia-northeast1
+
+  # ===== TODO(GCP構築後に修正) =====
+  PROJECT_ID: ${{ vars.PROJECT_ID }}
+  CLUSTER_NAME: ${{ vars.CLUSTER_NAME }}
+  REGISTRY: ${{ vars.REGISTRY }}
+  ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY }}
+
+  IMAGE_NAME: drf-api
+  GO_IMAGE_NAME: kubeguard
+
+jobs:
+
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      ## Django
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Django Test
+        working-directory: api-server
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          pip install -r requirements.txt
+          python manage.py test
+
+      ## Go
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Go Test
+        working-directory: go-audit
+        run: |
+          go mod download
+          go test -v .
+
+  deploy:
+
+    needs: test
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: |
+          gcloud auth configure-docker $REGISTRY
+
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t $REGISTRY/$PROJECT_ID/$ARTIFACT_REPOSITORY/$IMAGE_NAME:${{ github.sha }} \
+            ./api-server
+
+      - name: Push Docker Image
+        run: |
+          docker push \
+          $REGISTRY/$PROJECT_ID/$ARTIFACT_REPOSITORY/$IMAGE_NAME:${{ github.sha }}
+
+      # Goツールのイメージビルド&デプロイ
+      - name: Build Go Docker Image
+        run: |
+          docker build \
+            -t $REGISTRY/$PROJECT_ID/$ARTIFACT_REPOSITORY/$GO_IMAGE_NAME:${{ github.sha }} \
+            ./go-audit
+
+      - name: Push Go Docker Image
+        run: |
+          docker push \
+          $REGISTRY/$PROJECT_ID/$ARTIFACT_REPOSITORY/$GO_IMAGE_NAME:${{ github.sha }}
+
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.REGION }}
+
+      - name: Replace Docker Image
+        run: |
+          sed -i "s|IMAGE_PLACEHOLDER|$REGISTRY/$PROJECT_ID/$ARTIFACT_REPOSITORY/$IMAGE_NAME:${{ github.sha }}|g" \
+          k8s/drf-api.yaml
+
+      - name: Replace Docker Image for Go Audit
+        run: |
+          sed -i "s|GO_IMAGE_PLACEHOLDER|$REGISTRY/$PROJECT_ID/$ARTIFACT_REPOSITORY/$GO_IMAGE_NAME:${{ github.sha }}|g" \
+          k8s/go-audit.yaml
+
+      - name: Deploy
+        run: |
+          kubectl apply -f k8s/
+
+      # デプロイが本当に成功したか見届ける
+      - name: Wait for API Deployment
+        run: |
+          kubectl rollout status deployment/drf-api-deployment --timeout=180s
+
+  rollback:
+    needs:
+      - deploy
+
+    if: failure()
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.REGION }}
+
+      - name: Rollback
+        run: |
+          kubectl rollout undo deployment/drf-api-deployment
