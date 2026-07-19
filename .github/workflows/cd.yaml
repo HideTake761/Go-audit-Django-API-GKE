@@ -10,7 +10,7 @@ permissions:
   id-token: write
 
 env:
-  REGION: asia-northeast1
+  REGION: asia-northeast1-a
 
   # ===== TODO(GCP構築後に修正) =====
   PROJECT_ID: ${{ vars.PROJECT_ID }}
