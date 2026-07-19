@@ -65,7 +65,7 @@ spec:
           serviceAccountName: kubeguard-sa # 作成した権限を付与
           containers:
           - name: kubeguard
-            image: asia-northeast1-docker.pkg.dev/your-project/your-repo/kubeguard:latest
+            image: GO_IMAGE_PLACEHOLDER
             # Goツールの処理内でSlackへ通知を送るための環境変数
             env:
             - name: SLACK_WEBHOOK_URL # コンテナに渡す環境変数

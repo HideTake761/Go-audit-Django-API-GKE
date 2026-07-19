@@ -26,10 +26,10 @@ spec:
     spec:
       containers:
       - name: drf-api-container # 運用時にログを確認する際(>kubectl logs -c drf-api-container)に使用する識別子になる
-        image: drf-api:latest # ローカルPCでの動作確認用。ローカルにあるイメージ名を記入。
-        # image: asia-northeast1-docker.pkg.dev/your-project/your-repo/drf-api:latest # 本番(GCP)環境用
-        # Artifact Registry等の正しいイメージパスを記入【注意】
-        imagePullPolicy: Never # ローカルPCでの動作確認用。本番(GCP)環境ではコメントアウトする。
+        # image: drf-api:latest # ローカルPCでの動作確認用。ローカルにあるイメージ名を記入。
+        image: IMAGE_PLACEHOLDER # 本番(GCP)環境用      
+        # Artifact Registry等の正しいイメージパスを記入
+        # imagePullPolicy: Never # ローカルPCでの動作確認用。本番(GCP)環境ではコメントアウトする。
         # ローカルPCでの動作確認でこれを忘れると、Kubernetesがインターネット上のレジストリ(Docker Hubなど)から
         # イメージを探そうとしてエラー(ImagePullBackOff)になる。
         ports:
