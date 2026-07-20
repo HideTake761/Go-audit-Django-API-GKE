@@ -110,6 +110,12 @@ jobs:
           cluster_name: ${{ env.CLUSTER_NAME }}
           location: ${{ env.REGION }}
 
+      - name: Create Kubernetes Secret
+        run: |
+          kubectl create secret generic drf-secrets \
+            --from-literal=secret-key="${{ secrets.SECRET_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Replace Docker Image
         run: |
           sed -i "s|IMAGE_PLACEHOLDER|$REGISTRY/$PROJECT_ID/$ARTIFACT_REPOSITORY/$IMAGE_NAME:${{ github.sha }}|g" \
