@@ -124,6 +124,7 @@ metadata:
     # GCPのIngressコントローラに対し、外部ロードバランサーを作るよう指示
     # なのでTerraformでロードバランサー作成を書く必要がない。
     kubernetes.io/ingress.global-static-ip-name: "drf-api-static-ip" # 静的IPアドレスの割り当て
+    kubernetes.io/ingress.class: "gce"
 spec:
   ingressClassName: "gce"
   rules:
