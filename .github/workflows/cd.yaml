@@ -11,8 +11,6 @@ permissions:
 
 env:
   REGION: asia-northeast1-a
-
-  # ===== TODO(GCP構築後に修正) =====
   PROJECT_ID: ${{ vars.PROJECT_ID }}
   CLUSTER_NAME: ${{ vars.CLUSTER_NAME }}
   REGISTRY: ${{ vars.REGISTRY }}
@@ -114,6 +112,10 @@ jobs:
         run: |
           kubectl create secret generic drf-secrets \
             --from-literal=secret-key="${{ secrets.SECRET_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic slack-secret \
+            --from-literal=webhook-url="${{ secrets.SLACK_WEBHOOK_URL }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Replace Docker Image
