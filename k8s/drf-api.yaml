@@ -1,5 +1,5 @@
 # ==========================================
-# DRF API Deployment (アプリケーション本体)
+# DRF API Deployment(アプリケーション本体)
 # ==========================================
 apiVersion: apps/v1
 kind: Deployment
@@ -60,6 +60,7 @@ spec:
             cpu: "500m"
             memory: "512Mi"
         # 【監査クリア】Liveness Probe(死活監視)の設定
+        # Kubernetes内部のシステム用(Kubelet)
         livenessProbe:
           httpGet:
             path: /healthz/ # DRF側でヘルスチェック用エンドポイントを作成
@@ -69,13 +70,36 @@ spec:
 
 ---
 # ==========================================
-# DRF API Service (内部通信用の経路)
+# DRF API BackendConfig(GCLBヘルスチェック設定)
+# ==========================================
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: drf-api-backendconfig
+spec:
+  healthCheck:
+    type: HTTP
+    requestPath: /healthz/  # DRFのヘルスチェック用パスを指定
+    port: 8000
+    checkIntervalSec: 15
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+
+---
+# ==========================================
+# DRF API Service(内部通信用の経路)
 # ※Ingressがここを参照するため type: ClusterIP でOK
 # ==========================================
 apiVersion: v1
 kind: Service
 metadata:
   name: drf-api-service
+  annotations:
+    # 1. NEG(Container-Native Load Balancing)を有効化
+    cloud.google.com/neg: '{"ingress": true}'
+    # 2. 上記で作成したBackendConfigを紐付け
+    cloud.google.com/backend-config: '{"default": "drf-api-backendconfig"}'
 spec:
   # 【監査クリア】NodePort/LoadBalancerの警告を避けるためClusterIPを使用
   # ※外部公開する場合は、この前段にIngressやAPI Gatewayを配置するのが推奨
@@ -90,7 +114,7 @@ spec:
 
 ---
 # ==========================================
-# DRF API Ingress (ロードバランサーの設定)
+# DRF API Ingress(ロードバランサーの設定)
 # ==========================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
