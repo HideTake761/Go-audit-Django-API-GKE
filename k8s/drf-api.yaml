@@ -46,12 +46,7 @@ spec:
             secretKeyRef:
               name: drf-secrets
               key: secret-key
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: drf-secrets
-              key: database-url      
-
+   
         # 【監査クリア】CPUリクエストの設定
         resources:
           requests:
