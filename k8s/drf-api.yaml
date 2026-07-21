@@ -35,6 +35,10 @@ spec:
         ports:
         - containerPort: 8000
 
+        envFrom:
+        - secretRef:
+            name: django-db-secret # Terraformで作成したSecret名を指定
+
         # Django用の環境変数
         env:
         - name: DJANGO_SETTINGS_MODULE
