@@ -27,5 +27,5 @@ urlpatterns = [
     # Includes API URLs from 'myapi/urls.py'
     # api/にアクセスしたら、myapi/urls.pyで指定されているURLルーティングに従う
     # include():他のURLconf(URL設定ファイル)をインポートするために使われる
-    path('healthz', health_check),
+    path('healthz/', health_check),
 ]
