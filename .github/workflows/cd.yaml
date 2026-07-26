@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'api_server/**'
+      - 'go-audit/**'
+      - 'k8s/**'      
+      - '.github/workflows/cd.yaml'  
 
 permissions:
   contents: read
