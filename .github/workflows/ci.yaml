@@ -17,8 +17,7 @@ jobs:
         working-directory: api-server
 
     env:
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}     
 
     steps:
       - uses: actions/checkout@v4
