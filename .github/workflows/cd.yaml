@@ -43,8 +43,7 @@ jobs:
       - name: Django Test
         working-directory: api-server
         env:
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}          
         run: |
           pip install -r requirements.txt
           python manage.py test
